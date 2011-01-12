@@ -1,0 +1,56 @@
+
+        
+
+
+(defn solve [grid]
+  (let [len (count grid)
+        n (math/sqrt grid)
+        rng (:range n)
+        nums (map #(+ 1 %) rng)
+
+        coord (fn [grid r c] (nth (nth grid r) c))
+        nth-square [grid i] (let [r (* n (int (/ i 3)))
+                                  c (* n (int (mod i 3)))]
+                              (for [x (range 3) y (range 3)]
+                                (coord grid (+ r x) (+ c y))))
+        squares  (fn [grid] #(nth-square grid %) rng)
+        rows (fn [grid] grid)
+        cols (fn [grid] (let [col (fn [i] (map #(nth % i) (rows grid)))]
+
+
+; Grid geometry
+(defn coord [grid r c] (nth (nth grid r) c))
+(defn nth-square [grid i]
+  (let [n (size grid)
+        r (* n (int (/ i 3)))
+        c (* n (int (mod i 3)))]
+    (for [x (range 3) y (range 3)]
+      (coord grid (+ r x) (+ c y)))))
+
+(defn squares [grid] (map #(nth-square grid n %) (range n)))
+(defn rows [grid] grid)
+(defn cols [grid n]
+  (let [col (fn [i] (map #(nth % i) (rows grid)))]
+    (map col (range n))))
+
+; Validation
+(defn valid? [grid n]
+  (and
+    (every? no-doubles? (rows grid n))
+    (every? no-doubles? (cols grid n))
+    (every? no-doubles? (squares grid n))))
+
+; Searching
+(defn fill [loc n]
+  (let [nums (map #(+ 1 %) (range n))
+        options (map #(zip/next (zip/replace loc %)) nums)]
+    (filter #(valid? (zip/root %1)) options)))
+
+(defn search [loc n]
+  (cond
+    (zip/end? loc) (zip/root loc)
+    (vector? (zip/node loc)) (search (zip/next loc) n)
+    (pos? (zip/node loc)) (search (zip/next loc) n)
+    :else (any (map search (fill loc n) n))))
+
+(defn solve [grid n] (search (zip/vector-zip grid) n))

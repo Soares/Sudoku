@@ -1,56 +1,65 @@
 (ns one.core
   (:require [clojure.zip :as zip])
+  (:require [clojure.contrib.math :as math])
+  (:require [clojure.contrib.duck-streams :as io])
+  (:require [clojure.contrib.string :as string])
+  (:use clojure.set)
   (:gen-class))
 
-(def naturals (iterate #(+ 1 %1) 0))
-(def n 3)
-(def N (* n n))
-(def indexes (range N))
-(def nums (range 1 (+ 1 N)))
-(def puzzle [[0 7 6 0 0 0 0 4 0]
-             [0 9 0 0 5 7 6 0 8]
-             [0 4 0 9 0 0 3 0 0]
-             [0 6 0 0 0 8 4 0 0]
-             [9 0 2 5 0 4 7 0 3]
-             [0 0 3 6 0 0 0 8 0]
-             [0 0 9 0 0 6 0 3 0]
-             [7 0 5 1 4 0 0 9 0]
-             [0 3 0 0 0 0 2 7 0]])
+; Utility functions
+(defn any [lst] (first (filter identity lst)))
+(defn snap [x n] (- x (mod x n)))
+(defn vecmap [f a] (vec (map f a)))
 
-(defn -main [& args]
-  (println "Hello, world!"))
+(defn input [file]
+  (let [raw (io/read-lines file)
+        lists (map #(string/split #"\s" %) raw)
+        convert #(if (= % "-") 0 (Integer/parseInt %))]
+    (vecmap #(vecmap convert %) lists)))
 
-(defn any [lst] (some identity lst))
+(defn solve [grid]
 
-(defn coord [grid r c] (nth (nth grid r) c))
+  ; Define grid-dependant constants
+  (let [
+    counts (map count grid)         ; The size of each row
+    length (apply + counts)         ; Number of elements in grid
+    side (math/sqrt length)         ; The size of one side of the whole square
+    n (math/sqrt side)              ; The size of one side of an inner square
+    nums (set (range 1 (+ 1 side)))]
 
-(defn nth-square [i grid]
-  (let [r (* n (int (/ i 3)))
-        c (* n (mod i 3))]
-    (for [x (range 3) y (range 3)]
-      (coord grid (+ r x) (+ c y)))))
+  ; Define grid-dependant functions
+  (letfn [
+    ; Grid traversal
+    (nth-col [grid i] (take-nth side (drop i (apply concat grid))))
+    (coord-square [grid r c]
+      (let [i (snap r n), j (snap c n)]
+        (for [x (range n) y (range n)]
+          (nth (nth grid (+ i x)) (+ y j)))))
+    
+    ; Zipper manipulation
+    (row-of [loc] (zip/node (zip/up loc)))
+    (col-of [loc] (nth-col (zip/root loc) (count (zip/lefts loc))))
+    (sqr-of [loc] (coord-square (zip/root loc)
+      (count (zip/lefts (zip/up loc)))
+      (count (zip/lefts loc))))
 
-(defn rows [grid] grid)
-(defn cols [grid] (map (fn [i] (map #(nth %1 i) grid)) indexes))
-(defn squares [grid] (map #(nth-square %1 grid) indexes))
+    ; Search functions
+    (options [loc]
+      (difference nums (set (union (row-of loc) (col-of loc) (sqr-of loc)))))
+    (fill [loc] (map #(zip/next (zip/replace loc %)) (options loc)))
+    (search [loc]
+      (cond
+        (zip/end? loc) (zip/root loc)
+        (vector? (zip/node loc)) (search (zip/next loc))
+        (pos? (zip/node loc)) (search (zip/next loc))
+        :else (any (map search (fill loc)))))]
 
-(defn no-doubles? [lst] (apply distinct? (filter pos? lst)))
-(defn valid? [grid]
-  (and
-    (every? no-doubles? (rows grid))
-    (every? no-doubles? (cols grid))
-    (every? no-doubles? (squares grid))
-    grid))
+  ; Ensure that the grid is well-formed
+  (assert (integer? n))           ; The input is a valid length
+  (assert (apply = counts))       ; Each row is the same length
+  (assert (= side (count grid)))  ; The input is square
 
-(defn fill [loc]
-  (let [options (map #(zip/next (zip/replace loc %1)) nums)]
-    (filter #(valid? (zip/root %1)) options)))
-(defn search [loc]
-  (cond
-    (zip/end? loc) (zip/root loc)
-    (vector? (zip/node loc)) (search (zip/next loc))
-    (pos? (zip/node loc)) (search (zip/next loc))
-    :else (any (map search (fill loc)))))
-(defn solve [grid] (search (zip/vector-zip grid)))
+  ; Solve the grid
+  (search (zip/vector-zip grid)))))
 
-(println (solve puzzle))
+(defn -main [file] (map println (solve (input file))))
