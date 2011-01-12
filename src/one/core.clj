@@ -10,7 +10,8 @@
   (let [raw (io/read-lines file)
         zeroed (map #(string/replace-char \- \0 %) raw)
         words (map #(string/split #"\s" %) zeroed)
-        data (map (partial map #(Integer/parseInt %)) words)]
+        ; Java classes are retarded and can't be closure'd. Hence the wrapping.
+        data (map (partial map #(Integer. %)) words)]
     (vec (map vec data))))
 
 (defn solve [grid]
@@ -28,6 +29,7 @@
     ; Grid traversal
     (nth-col [grid i] (take-nth side (drop i (apply concat grid))))
     (coord-square [grid r c]
+      ; (i, j) is the top left corner of (r, c)'s mini square
       (let [i (- r (mod r n))
             j (- c (mod c n))]
         (for [x (range n) y (range n)]
