@@ -62,4 +62,4 @@
   ; Solve the grid
   (search (zip/vector-zip grid)))))
 
-(defn -main [file] (map println (solve (input file))))
+(defn -main [file] (dorun (map println (solve (input file)))))
